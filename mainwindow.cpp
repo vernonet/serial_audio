@@ -13,6 +13,7 @@
 #include <QComboBox>
 #include <QTimer>
 #include <QTime>
+#include <QLineEdit>
 
 
 
@@ -33,6 +34,9 @@ uint32_t smp_rate=0;
 uint8_t bits_per_sample = 16;
 uint32_t baud_rate=500000;
 uint32_t play_size=0;
+//QValidator *validator;
+
+
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -45,9 +49,11 @@ MainWindow::MainWindow(QWidget *parent) :
     for (const QSerialPortInfo &info : infos)
         ui->comboBox_port->addItem(info.portName());
     ui->comboBox_port->setFocus();
+
     ui->comboBox_s_rate->addItem("22050");
     ui->comboBox_s_rate->addItem("16029");
     ui->comboBox_s_rate->addItem("37400");
+    ui->comboBox_s_rate->addItem("custom");
 
     ui->pushButton_2->setToolTip("if noise or silence, click once or more");
     ui->pushButton_2->setToolTipDuration(3000);
@@ -59,6 +65,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->comboBox_b_rate->addItem("500000");
     ui->comboBox_b_rate->addItem("921600");
+    ui->comboBox_b_rate->addItem("custom");
     ui->comboBox_b_rate->setToolTip("921600 optimal for sample rate > 22050 or bits > 16, otherwise you can set 500000");
     ui->comboBox_b_rate->setToolTipDuration(4000);
 
@@ -97,7 +104,7 @@ void MainWindow::on_pushButton_clicked()
 
         audio = new QAudioOutput(format);
         audio->setBufferSize(16384);
-        audio->setVolume(0.1);
+        audio->setVolume(0.2);
         connect(audio, SIGNAL(stateChanged(QAudio::State)), this, SLOT(handleStateChanged(QAudio::State)));
         serial.setBaudRate(baud_rate);
         if (!serial.open(QIODevice::ReadWrite)) {
@@ -177,8 +184,22 @@ void MainWindow::ReadInPort(){//
 
 void MainWindow::on_comboBox_s_rate_currentIndexChanged(const QString &arg1)
 {
-    smp_rate = arg1.toUInt(nullptr);
-    qDebug() << "smp_rate = " << smp_rate;
+    QValidator *s_rate_validator = new QIntValidator(1000, 50000, this);
+
+    if (arg1.compare("custom") == 0){
+       ui->comboBox_s_rate->setEditable(true);
+       ui->comboBox_s_rate->clearEditText();
+       QLineEdit *cus_srate = ui->comboBox_s_rate->lineEdit();
+       cus_srate->setValidator(s_rate_validator);
+       smp_rate = ui->comboBox_s_rate->currentData().toUInt(nullptr);
+    }
+
+
+    else  {
+        ui->comboBox_s_rate->setEditable(false);
+        smp_rate = arg1.toUInt(nullptr);
+    }
+    qDebug() << "smp_rate  = " << smp_rate;
 }
 
 void delay( int millisecondsToWait )
@@ -202,5 +223,20 @@ void MainWindow::on_comboBox_bits_currentIndexChanged(const QString &arg1)
 
 void MainWindow::on_comboBox_b_rate_currentIndexChanged(const QString &arg1)
 {
-   baud_rate = arg1.toUInt(nullptr);
+    QValidator *b_rate_validator = new QIntValidator(9600, 1000000, this);
+
+    if (arg1.compare("custom") == 0){
+       ui->comboBox_b_rate->setEditable(true);
+       ui->comboBox_b_rate->clearEditText();
+       QLineEdit *cus_brate = ui->comboBox_b_rate->lineEdit();
+       cus_brate->setValidator(b_rate_validator);
+       baud_rate = ui->comboBox_s_rate->currentData().toUInt(nullptr);
+    }
+
+    else {
+      ui->comboBox_b_rate->setEditable(false);
+      baud_rate = arg1.toUInt(nullptr);
+    }
+
+    qDebug() << "baud_rate = " << baud_rate;
 }
