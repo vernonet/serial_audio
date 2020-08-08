@@ -19,6 +19,7 @@
 
 #define BAUDRATE     (921600)    //500000  for  samplerate 22050
 #define PLAY_TIME    (600)       //sec   0 - unlimited
+#define VOLUME       (1.0)       //0.0 to 1.0
 
 void delay( int millisecondsToWait );
 
@@ -52,6 +53,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->comboBox_s_rate->addItem("22050");
     ui->comboBox_s_rate->addItem("16029");
+    ui->comboBox_s_rate->addItem("33085");
     ui->comboBox_s_rate->addItem("37400");
     ui->comboBox_s_rate->addItem("custom");
 
@@ -63,10 +65,11 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->comboBox_bits->setToolTip("bits per sample");
     ui->comboBox_bits->setToolTipDuration(3000);
 
-    ui->comboBox_b_rate->addItem("500000");
+    ui->comboBox_b_rate->addItem("460800");
     ui->comboBox_b_rate->addItem("921600");
+    ui->comboBox_b_rate->addItem("1500000");
     ui->comboBox_b_rate->addItem("custom");
-    ui->comboBox_b_rate->setToolTip("921600 optimal for sample rate > 22050 or bits > 16, otherwise you can set 500000");
+    ui->comboBox_b_rate->setToolTip("921600 optimal for sample rate > 22050 or bits > 16, otherwise you can set 460800");
     ui->comboBox_b_rate->setToolTipDuration(4000);
 
 
@@ -104,7 +107,7 @@ void MainWindow::on_pushButton_clicked()
 
         audio = new QAudioOutput(format);
         audio->setBufferSize(16384);
-        audio->setVolume(0.2);
+        audio->setVolume(VOLUME);
         connect(audio, SIGNAL(stateChanged(QAudio::State)), this, SLOT(handleStateChanged(QAudio::State)));
         serial.setBaudRate(baud_rate);
         if (!serial.open(QIODevice::ReadWrite)) {
