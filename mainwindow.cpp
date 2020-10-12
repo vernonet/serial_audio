@@ -29,7 +29,7 @@ QBuffer file;
 QAudioOutput* audio;
 QSerialPort serial;
 QTimer *tmr;
-volatile bool first, shift = false;
+volatile bool first, shift = false, play_started = false;
 int posic = 0;
 uint32_t smp_rate=0;
 uint8_t bits_per_sample = 16;
@@ -82,57 +82,75 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_pushButton_clicked()
 {
+    if (!play_started) {
+            play_started = true;
+            ui->pushButton->setText("STOP");
+            ui->pushButton->setStyleSheet("color: red");
 
-    tmr = new QTimer();        //timer for reading serial data
-    tmr->setInterval(400);     //400ms
-    connect(tmr, SIGNAL(timeout()), this, SLOT(ReadInPort()));
-    //tmr->start();
+            tmr = new QTimer();        //timer for reading serial data
+            tmr->setInterval(400);     //400ms
+            connect(tmr, SIGNAL(timeout()), this, SLOT(ReadInPort()));
+            //tmr->start();
 
-    QAudioFormat format;
-    // Set up the format, eg.
-    if (smp_rate) format.setSampleRate(smp_rate);
-        else format.setSampleRate(22050);
-    format.setChannelCount(1);
-    format.setSampleSize(bits_per_sample);
-    format.setCodec("audio/pcm");
-    format.setByteOrder(QAudioFormat::LittleEndian);
-    format.setSampleType(QAudioFormat::SignedInt);
+            QAudioFormat format;
+            // Set up the format, eg.
+            if (smp_rate) format.setSampleRate(smp_rate);
+                else format.setSampleRate(22050);
+            format.setChannelCount(1);
+            format.setSampleSize(bits_per_sample);
+            format.setCodec("audio/pcm");
+            format.setByteOrder(QAudioFormat::LittleEndian);
+            format.setSampleType(QAudioFormat::SignedInt);
 
-    QAudioDeviceInfo info(QAudioDeviceInfo::defaultOutputDevice());
-        if (!info.isFormatSupported(format)) {
-            qWarning() << "Raw audio format not supported by backend, cannot play audio.";
-            return;
+            QAudioDeviceInfo info(QAudioDeviceInfo::defaultOutputDevice());
+                if (!info.isFormatSupported(format)) {
+                    qWarning() << "Raw audio format not supported by backend, cannot play audio.";
+                    return;
+                }
+
+
+                audio = new QAudioOutput(format);
+                audio->setBufferSize(16384);
+                audio->setVolume(VOLUME);
+                connect(audio, SIGNAL(stateChanged(QAudio::State)), this, SLOT(handleStateChanged(QAudio::State)));
+                serial.setBaudRate(baud_rate);
+                if (!serial.open(QIODevice::ReadWrite)) {
+                    emit error(tr("Can't open %1, error code %2")
+                               .arg(serial.portName()).arg(serial.error()));
+                    return;
+                }
+                delay(1000);
+                arrey_0 = serial.readAll();
+                int p_ff = arrey_0.indexOf(0xff);
+                posic = arrey_0.size();
+                qDebug() << "posic = " << posic <<"  0xFF pos -> " << p_ff ;
+                play_size = smp_rate * bits_per_sample/8 * PLAY_TIME;
+                qDebug() << "play_size = " <<play_size;
+         #if (PLAY_TIME)
+                arrey_0.resize(play_size);     //50000000
+         #else
+                 arrey_0.resize(50000000);
+         #endif
+                file.setBuffer(&arrey_0);
+                file.open(QIODevice::ReadOnly);
+
+                if(p_ff>=0) file.seek(p_ff+2);
+                tmr->start();
+                audio->start(&file);
         }
+      else {
+        play_started = false;
+        ui->pushButton->setText("PLAY");
+        ui->pushButton->setStyleSheet("color: black");
+        tmr->stop();
+        audio->stop();
+        file.close();
+        serial.close();
+        disconnect(tmr, SIGNAL(timeout()), this, SLOT(ReadInPort()));
+        disconnect(audio, SIGNAL(stateChanged(QAudio::State)), this, SLOT(handleStateChanged(QAudio::State)));
+    }
 
 
-        audio = new QAudioOutput(format);
-        audio->setBufferSize(16384);
-        audio->setVolume(VOLUME);
-        connect(audio, SIGNAL(stateChanged(QAudio::State)), this, SLOT(handleStateChanged(QAudio::State)));
-        serial.setBaudRate(baud_rate);
-        if (!serial.open(QIODevice::ReadWrite)) {
-            emit error(tr("Can't open %1, error code %2")
-                       .arg(serial.portName()).arg(serial.error()));
-            return;
-        }
-        delay(1000);
-        arrey_0 = serial.readAll();
-        int p_ff = arrey_0.indexOf(0xff);
-        posic = arrey_0.size();
-        qDebug() << "posic = " << posic <<"  0xFF pos -> " << p_ff ;
-        play_size = smp_rate * bits_per_sample/8 * PLAY_TIME;
-        qDebug() << "play_size = " <<play_size;
- #if (PLAY_TIME)
-        arrey_0.resize(play_size);     //50000000
- #else
-         arrey_0.resize(50000000);
- #endif
-        file.setBuffer(&arrey_0);
-        file.open(QIODevice::ReadOnly);
-
-        if(p_ff>=0) file.seek(p_ff+2);
-        tmr->start();
-        audio->start(&file);
 
 }
 
@@ -151,7 +169,7 @@ void MainWindow::handleStateChanged(QAudio::State state) {
                         if (audio->error() != QAudio::NoError) {
                             // Error handling
                         }
-                        qApp->exit();
+                        //qApp->exit();
                         break;
 
                     default:
